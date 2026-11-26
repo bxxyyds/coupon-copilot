@@ -1,24 +1,51 @@
-# Compiled class file
+# ===== Java / Maven =====
 *.class
-
-# Log file
-*.log
-
-# BlueJ files
-*.ctxt
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
 *.jar
 *.war
 *.nar
 *.ear
+target/
+hs_err_pid*
+replay_pid*
+!.mvn/wrapper/maven-wrapper.jar
+
+# ===== IDE =====
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.DS_Store
+
+# ===== Logs =====
+*.log
+logs/
+
+# ===== Secrets (NEVER commit) =====
+.env
+.env.*
+!.env.example
+application-local.yml
+application-local.yaml
+
+# ===== Frontend =====
+node_modules/
+dist/
+*.tsbuildinfo
+
+# ===== Docker volumes / local data =====
+docker/data/
+docker/volumes/
+
+# ===== Archives =====
 *.zip
 *.tar.gz
 *.rar
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
-replay_pid*
+# ===== Local planning & AI workflow (keep local only) =====
+AGENTS.md
+docs/MASTER_PLAN.md
+docs/ROADMAP.md
+docs/PROGRESS.md
+docs/archive/
+
