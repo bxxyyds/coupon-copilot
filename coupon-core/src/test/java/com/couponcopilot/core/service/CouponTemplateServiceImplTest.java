@@ -9,6 +9,10 @@ import com.couponcopilot.core.dao.entity.CouponTemplateDO;
 import com.couponcopilot.core.dao.mapper.CouponTemplateMapper;
 import com.couponcopilot.core.dto.req.CouponTemplateCreateReq;
 import com.couponcopilot.core.dto.resp.CouponTemplateCreateResp;
+import com.couponcopilot.core.service.chain.ChainContext;
+import com.couponcopilot.core.service.chain.template.TemplateParamNotNullChainHandler;
+import com.couponcopilot.core.service.chain.template.TemplateRuleJsonChainHandler;
+import com.couponcopilot.core.service.chain.template.TemplateTimeChainHandler;
 import com.couponcopilot.core.service.impl.CouponTemplateServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -20,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -39,7 +44,12 @@ class CouponTemplateServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new CouponTemplateServiceImpl(couponTemplateMapper, new ObjectMapper());
+        ChainContext chainContext = new ChainContext(List.of(
+                new TemplateRuleJsonChainHandler(new ObjectMapper()),
+                new TemplateParamNotNullChainHandler(),
+                new TemplateTimeChainHandler()
+        ));
+        service = new CouponTemplateServiceImpl(couponTemplateMapper, chainContext);
     }
 
     @AfterEach
@@ -144,12 +154,24 @@ class CouponTemplateServiceImplTest {
     }
 
     @Test
-    void shouldRejectInvalidJsonRule() {
+    void shouldRejectInvalidJsonRuleWithRuleErrorCode() {
         UserContext.set(UserInfo.builder().role(UserRole.MERCHANT).userId(9001L).shopId(1001L).build());
         CouponTemplateCreateReq req = validReq();
         req.setConsumeRule("not-json");
 
-        assertThrows(ClientException.class, () -> service.createTemplate(req));
+        ClientException ex = assertThrows(ClientException.class, () -> service.createTemplate(req));
+        assertEquals(BaseErrorCode.INVALID_COUPON_RULE.code(), ex.getErrorCode());
+        verify(couponTemplateMapper, never()).insert(any(CouponTemplateDO.class));
+    }
+
+    @Test
+    void shouldRejectThresholdLessThanDiscountBeforeInsert() {
+        UserContext.set(UserInfo.builder().role(UserRole.MERCHANT).userId(9001L).shopId(1001L).build());
+        CouponTemplateCreateReq req = validReq();
+        req.setConsumeRule("{\"termsOfUse\":100,\"maximumDiscountAmount\":120}");
+
+        ClientException ex = assertThrows(ClientException.class, () -> service.createTemplate(req));
+        assertEquals(BaseErrorCode.INVALID_COUPON_RULE.code(), ex.getErrorCode());
         verify(couponTemplateMapper, never()).insert(any(CouponTemplateDO.class));
     }
 

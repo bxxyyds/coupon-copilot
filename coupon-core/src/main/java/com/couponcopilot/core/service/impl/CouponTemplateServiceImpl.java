@@ -2,7 +2,6 @@ package com.couponcopilot.core.service.impl;
 
 import com.couponcopilot.common.context.UserContext;
 import com.couponcopilot.common.context.UserRole;
-import com.couponcopilot.common.errorcode.BaseErrorCode;
 import com.couponcopilot.common.exception.ClientException;
 import com.couponcopilot.core.common.enums.CouponSourceEnum;
 import com.couponcopilot.core.common.enums.CouponStatusEnum;
@@ -12,15 +11,11 @@ import com.couponcopilot.core.dao.mapper.CouponTemplateMapper;
 import com.couponcopilot.core.dto.req.CouponTemplateCreateReq;
 import com.couponcopilot.core.dto.resp.CouponTemplateCreateResp;
 import com.couponcopilot.core.service.CouponTemplateService;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.couponcopilot.core.service.chain.ChainBizMark;
+import com.couponcopilot.core.service.chain.ChainContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
-
-import java.time.LocalDateTime;
 
 /**
  * 优惠券模板业务服务实现。
@@ -31,13 +26,17 @@ import java.time.LocalDateTime;
 public class CouponTemplateServiceImpl implements CouponTemplateService {
 
     private final CouponTemplateMapper couponTemplateMapper;
-    private final ObjectMapper objectMapper;
+    private final ChainContext chainContext;
 
     @Override
     public CouponTemplateCreateResp createTemplate(CouponTemplateCreateReq req) {
         UserContext.requireRole(UserRole.MERCHANT);
         Long shopId = resolveShopId(req.getSource());
-        String normalizedGoodsCode = validateAndNormalize(req);
+        chainContext.execute(ChainBizMark.COUPON_TEMPLATE_CREATE, req);
+
+        String normalizedGoodsCode = CouponTargetEnum.SPECIFIC_GOODS.getCode().equals(req.getTarget())
+                ? req.getGoodsCode().trim()
+                : null;
 
         CouponTemplateDO entity = CouponTemplateDO.builder()
                 .shopId(shopId)
@@ -76,37 +75,5 @@ public class CouponTemplateServiceImpl implements CouponTemplateService {
             throw new ClientException("店铺券请求头 X-Shop-Id 必须大于0");
         }
         return shopId;
-    }
-
-    private String validateAndNormalize(CouponTemplateCreateReq req) {
-        String normalizedGoodsCode = null;
-        if (CouponTargetEnum.SPECIFIC_GOODS.getCode().equals(req.getTarget())) {
-            if (!StringUtils.hasText(req.getGoodsCode())) {
-                throw new ClientException("指定商品券必须填写商品编码");
-            }
-            normalizedGoodsCode = req.getGoodsCode().trim();
-        }
-
-        if (!req.getValidEndTime().isAfter(req.getValidStartTime())) {
-            throw new ClientException("有效期结束时间必须晚于开始时间", BaseErrorCode.INVALID_TIME_RANGE);
-        }
-        if (!req.getValidEndTime().isAfter(LocalDateTime.now())) {
-            throw new ClientException("有效期结束时间必须晚于当前时间", BaseErrorCode.INVALID_TIME_RANGE);
-        }
-
-        validateJsonObject("receiveRule", req.getReceiveRule());
-        validateJsonObject("consumeRule", req.getConsumeRule());
-        return normalizedGoodsCode;
-    }
-
-    private void validateJsonObject(String fieldName, String rawJson) {
-        try {
-            JsonNode node = objectMapper.readTree(rawJson);
-            if (node == null || !node.isObject()) {
-                throw new ClientException(fieldName + " 必须为合法的 JSON 对象");
-            }
-        } catch (JsonProcessingException ex) {
-            throw new ClientException(fieldName + " 必须为合法的 JSON 对象");
-        }
     }
 }

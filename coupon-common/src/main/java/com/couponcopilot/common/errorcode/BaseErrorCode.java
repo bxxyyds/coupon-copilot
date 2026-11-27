@@ -9,6 +9,7 @@ public enum BaseErrorCode implements IErrorCode {
     CLIENT_ERROR("A000001", "请求参数校验失败"),
     REQUEST_BODY_ERROR("A000100", "请求体格式错误"),
     INVALID_TIME_RANGE("A000101", "时间参数非法"),
+    INVALID_COUPON_RULE("A000102", "优惠券规则配置非法"),
     NOT_FOUND("A000404", "请求资源不存在"),
 
     // ========== B: 业务状态与系统错误 ==========
