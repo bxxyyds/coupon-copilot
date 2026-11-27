@@ -1,0 +1,28 @@
+name: coupon-copilot
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: coupon-copilot-mysql
+    profiles: ["base"]
+    restart: unless-stopped
+    mem_limit: 512m
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?please set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-coupon_copilot}
+      TZ: Asia/Shanghai
+    command:
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+      - "--default-time-zone=+08:00"
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
