@@ -24,6 +24,9 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <spring-boot.version>3.5.7</spring-boot.version>
+        <mybatis-plus.version>3.5.14</mybatis-plus.version>
+        <knife4j.version>4.5.0</knife4j.version>
+        <springdoc.version>2.8.13</springdoc.version>
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
         <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
     </properties>
@@ -44,6 +47,26 @@
                 <groupId>com.couponcopilot</groupId>
                 <artifactId>coupon-common</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+
+            <!-- MyBatis-Plus Spring Boot 3 Starter -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+
+            <!-- Knife4j OpenAPI 3 UI（纯前端静态资源 /doc.html，配合下方 springdoc 2.8.x 兼容 Spring Boot 3.5.7） -->
+            <dependency>
+                <groupId>com.github.xiaoymin</groupId>
+                <artifactId>knife4j-openapi3-ui</artifactId>
+                <version>${knife4j.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

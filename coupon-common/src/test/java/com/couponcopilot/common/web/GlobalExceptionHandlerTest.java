@@ -12,6 +12,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
@@ -104,6 +106,14 @@ class GlobalExceptionHandlerTest {
                 .andExpect(content().string(not(containsString("secret_db_password_leak"))));
     }
 
+    @Test
+    void shouldReturn404ResultWhenResourceNotFound() throws Exception {
+        mockMvc.perform(get("/test/not-found"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("A000404"))
+                .andExpect(jsonPath("$.message").value("请求资源不存在"));
+    }
+
     @RestController
     static class TestController {
 
@@ -130,6 +140,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/test/unexpected-error")
         public Result<Void> unexpectedError() {
             throw new RuntimeException("secret_db_password_leak");
+        }
+
+        @GetMapping("/test/not-found")
+        public Result<Void> notFound() throws NoResourceFoundException {
+            throw new NoResourceFoundException(HttpMethod.GET, "favicon.ico");
         }
     }
 

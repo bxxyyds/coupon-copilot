@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.BindException;
@@ -15,8 +16,10 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -81,6 +84,13 @@ public class GlobalExceptionHandler {
         }
         log.warn("Bad request format on [{} {}]: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
         return Result.failure(BaseErrorCode.REQUEST_BODY_ERROR.code(), msg);
+    }
+
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    @ExceptionHandler(NoResourceFoundException.class)
+    public Result<Void> handleNoResourceFoundException(NoResourceFoundException ex, HttpServletRequest request) {
+        log.debug("Resource not found on [{} {}]: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        return Result.failure(BaseErrorCode.NOT_FOUND);
     }
 
     @ExceptionHandler(Throwable.class)
