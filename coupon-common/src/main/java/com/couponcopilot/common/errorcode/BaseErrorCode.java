@@ -14,6 +14,8 @@ public enum BaseErrorCode implements IErrorCode {
 
     // ========== B: 业务状态与系统错误 ==========
     SERVICE_ERROR("B000001", "系统繁忙，请稍后再试"),
+    COUPON_TEMPLATE_NOT_FOUND("B000101", "优惠券模板不存在"),
+    COUPON_TEMPLATE_ENDED("B000102", "优惠券模板已结束"),
     COUPON_STOCK_NOT_ENOUGH("B000201", "优惠券库存不足"),
     COUPON_RECEIVE_LIMIT_EXCEEDED("B000202", "已达到每人限领上限"),
     COUPON_ALREADY_LOCKED("B000301", "优惠券已被锁定"),

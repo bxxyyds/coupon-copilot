@@ -1,14 +1,21 @@
 package com.couponcopilot.core.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.couponcopilot.common.context.UserContext;
 import com.couponcopilot.common.context.UserInfo;
 import com.couponcopilot.common.context.UserRole;
 import com.couponcopilot.common.errorcode.BaseErrorCode;
 import com.couponcopilot.common.exception.ClientException;
+import com.couponcopilot.common.exception.ServiceException;
 import com.couponcopilot.core.dao.entity.CouponTemplateDO;
 import com.couponcopilot.core.dao.mapper.CouponTemplateMapper;
 import com.couponcopilot.core.dto.req.CouponTemplateCreateReq;
+import com.couponcopilot.core.dto.req.CouponTemplateIncreaseStockReq;
+import com.couponcopilot.core.dto.req.CouponTemplatePageReq;
+import com.couponcopilot.core.dto.req.CouponTemplateTerminateReq;
 import com.couponcopilot.core.dto.resp.CouponTemplateCreateResp;
+import com.couponcopilot.core.dto.resp.CouponTemplateResp;
+import com.couponcopilot.core.dto.resp.PageResp;
 import com.couponcopilot.core.service.chain.ChainContext;
 import com.couponcopilot.core.service.chain.template.TemplateParamNotNullChainHandler;
 import com.couponcopilot.core.service.chain.template.TemplateRuleJsonChainHandler;
@@ -173,6 +180,124 @@ class CouponTemplateServiceImplTest {
         ClientException ex = assertThrows(ClientException.class, () -> service.createTemplate(req));
         assertEquals(BaseErrorCode.INVALID_COUPON_RULE.code(), ex.getErrorCode());
         verify(couponTemplateMapper, never()).insert(any(CouponTemplateDO.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldPageTemplatesForCurrentShop() {
+        UserContext.set(UserInfo.builder().role(UserRole.MERCHANT).userId(9001L).shopId(1001L).build());
+        CouponTemplatePageReq req = new CouponTemplatePageReq();
+        req.setCurrent(1L);
+        req.setSize(10L);
+        req.setMaxStock(100);
+
+        CouponTemplateDO row1 = CouponTemplateDO.builder().id(1L).shopId(1001L).name("低库存券A").stock(20).status(0).build();
+        CouponTemplateDO row2 = CouponTemplateDO.builder().id(2L).shopId(1001L).name("低库存券B").stock(50).status(0).build();
+        when(couponTemplateMapper.selectPage(any(Page.class), any())).thenAnswer(invocation -> {
+            Page<CouponTemplateDO> page = invocation.getArgument(0);
+            page.setTotal(2L);
+            page.setRecords(List.of(row1, row2));
+            return page;
+        });
+
+        PageResp<CouponTemplateResp> resp = service.pageTemplates(req);
+
+        assertEquals(1L, resp.getCurrent());
+        assertEquals(10L, resp.getSize());
+        assertEquals(2L, resp.getTotal());
+        assertEquals(2, resp.getRecords().size());
+        assertEquals(20, resp.getRecords().get(0).getStock());
+    }
+
+    @Test
+    void shouldIncreaseStockForActiveTemplate() {
+        UserContext.set(UserInfo.builder().role(UserRole.MERCHANT).userId(9001L).shopId(1001L).build());
+        CouponTemplateDO active = CouponTemplateDO.builder()
+                .id(100L).shopId(1001L).name("测试券").stock(20).status(0)
+                .validEndTime(LocalDateTime.now().plusDays(5))
+                .build();
+        CouponTemplateDO refreshed = CouponTemplateDO.builder()
+                .id(100L).shopId(1001L).name("测试券").stock(70).status(0)
+                .validEndTime(active.getValidEndTime())
+                .build();
+
+        when(couponTemplateMapper.selectOne(any())).thenReturn(active, refreshed);
+        when(couponTemplateMapper.increaseStock(1001L, 100L, 50)).thenReturn(1);
+
+        CouponTemplateIncreaseStockReq req = new CouponTemplateIncreaseStockReq();
+        req.setTemplateId(100L);
+        req.setDelta(50);
+
+        CouponTemplateResp resp = service.increaseStock(req);
+        assertEquals(70, resp.getStock());
+        verify(couponTemplateMapper).increaseStock(1001L, 100L, 50);
+    }
+
+    @Test
+    void shouldRejectIncreaseStockWhenEndedOrExpired() {
+        UserContext.set(UserInfo.builder().role(UserRole.MERCHANT).userId(9001L).shopId(1001L).build());
+        CouponTemplateIncreaseStockReq req = new CouponTemplateIncreaseStockReq();
+        req.setTemplateId(100L);
+        req.setDelta(50);
+
+        CouponTemplateDO ended = CouponTemplateDO.builder()
+                .id(100L).shopId(1001L).stock(20).status(1)
+                .validEndTime(LocalDateTime.now().plusDays(5))
+                .build();
+        when(couponTemplateMapper.selectOne(any())).thenReturn(ended);
+        ServiceException ex1 = assertThrows(ServiceException.class, () -> service.increaseStock(req));
+        assertEquals(BaseErrorCode.COUPON_TEMPLATE_ENDED.code(), ex1.getErrorCode());
+
+        CouponTemplateDO expired = CouponTemplateDO.builder()
+                .id(100L).shopId(1001L).stock(20).status(0)
+                .validEndTime(LocalDateTime.now().minusMinutes(1))
+                .build();
+        when(couponTemplateMapper.selectOne(any())).thenReturn(expired);
+        ServiceException ex2 = assertThrows(ServiceException.class, () -> service.increaseStock(req));
+        assertEquals(BaseErrorCode.COUPON_TEMPLATE_ENDED.code(), ex2.getErrorCode());
+
+        verify(couponTemplateMapper, never()).increaseStock(any(), any(), any());
+    }
+
+    @Test
+    void shouldRejectIncreaseStockWhenTemplateNotFound() {
+        UserContext.set(UserInfo.builder().role(UserRole.MERCHANT).userId(9001L).shopId(1001L).build());
+        when(couponTemplateMapper.selectOne(any())).thenReturn(null);
+
+        CouponTemplateIncreaseStockReq req = new CouponTemplateIncreaseStockReq();
+        req.setTemplateId(999L);
+        req.setDelta(10);
+
+        ServiceException ex = assertThrows(ServiceException.class, () -> service.increaseStock(req));
+        assertEquals(BaseErrorCode.COUPON_TEMPLATE_NOT_FOUND.code(), ex.getErrorCode());
+    }
+
+    @Test
+    void shouldTerminateActiveTemplate() {
+        UserContext.set(UserInfo.builder().role(UserRole.MERCHANT).userId(9001L).shopId(1001L).build());
+        CouponTemplateDO active = CouponTemplateDO.builder().id(100L).shopId(1001L).status(0).build();
+        when(couponTemplateMapper.selectOne(any())).thenReturn(active);
+        when(couponTemplateMapper.terminateTemplate(1001L, 100L)).thenReturn(1);
+
+        CouponTemplateTerminateReq req = new CouponTemplateTerminateReq();
+        req.setTemplateId(100L);
+        service.terminateTemplate(req);
+
+        verify(couponTemplateMapper).terminateTemplate(1001L, 100L);
+    }
+
+    @Test
+    void shouldRejectDuplicateTerminateWhenAlreadyEnded() {
+        UserContext.set(UserInfo.builder().role(UserRole.MERCHANT).userId(9001L).shopId(1001L).build());
+        CouponTemplateDO ended = CouponTemplateDO.builder().id(100L).shopId(1001L).status(1).build();
+        when(couponTemplateMapper.selectOne(any())).thenReturn(ended);
+
+        CouponTemplateTerminateReq req = new CouponTemplateTerminateReq();
+        req.setTemplateId(100L);
+
+        ServiceException ex = assertThrows(ServiceException.class, () -> service.terminateTemplate(req));
+        assertEquals(BaseErrorCode.COUPON_TEMPLATE_ENDED.code(), ex.getErrorCode());
+        verify(couponTemplateMapper, never()).terminateTemplate(any(), any());
     }
 
     private static CouponTemplateCreateReq validReq() {

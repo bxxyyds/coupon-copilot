@@ -56,6 +56,12 @@
                 <version>${mybatis-plus.version}</version>
             </dependency>
 
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-jsqlparser</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+
             <!-- Knife4j OpenAPI 3 UI（纯前端静态资源 /doc.html，配合下方 springdoc 2.8.x 兼容 Spring Boot 3.5.7） -->
             <dependency>
                 <groupId>com.github.xiaoymin</groupId>
